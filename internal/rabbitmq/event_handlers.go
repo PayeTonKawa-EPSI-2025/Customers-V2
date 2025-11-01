@@ -7,6 +7,8 @@ import (
 
 	"github.com/PayeTonKawa-EPSI-2025/Common/models"
 	"gorm.io/gorm"
+
+	localModels "github.com/PayeTonKawa-EPSI-2025/Customers/internal/models"
 )
 
 // GenericEvent is a structure for parsing event data from other services
@@ -34,7 +36,7 @@ type ProductEvent struct {
 func SetupEventHandlers(dbConn *gorm.DB) *EventRouter {
 	router := NewEventRouter()
 
-	// Handle order events (for example, when a new order is created)
+	// Handle order.created events - create order in local DB
 	router.RegisterHandler("order.created", func(body []byte) error {
 		var event OrderEvent
 		if err := json.Unmarshal(body, &event); err != nil {
@@ -42,56 +44,44 @@ func SetupEventHandlers(dbConn *gorm.DB) *EventRouter {
 			return err
 		}
 
-		log.Printf("Received order.created event for order %d by customer %d",
-			event.Order.ID, event.Order.CustomerID)
+		log.Printf("Received order.created event for order %d", event.Order.ID)
 
-		// You could update customer statistics here, for example:
-		// - Number of orders
-		// - Last order date
-		// - Total spent
+		// Create the order in the local database
+		order := localModels.Order{
+			ID: event.Order.ID,
+		}
+
+		if err := dbConn.Create(&order).Error; err != nil {
+			log.Printf("Error creating order in DB: %v", err)
+			return err
+		}
+
+		log.Printf("Successfully created order %d in local database", order.ID)
 
 		return nil
 	})
 
-	// Handle product events
-	router.RegisterHandler("product.*", func(body []byte) error {
-		var generic GenericEvent
-		if err := json.Unmarshal(body, &generic); err != nil {
-			log.Printf("Error unmarshaling generic event: %v", err)
+	// Handle product.created events - create product in local DB
+	router.RegisterHandler("product.created", func(body []byte) error {
+		var event ProductEvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("Error unmarshaling product event: %v", err)
 			return err
 		}
 
-		log.Printf("Received product event of type %s", generic.Type)
+		log.Printf("Received product.created event for product %d", event.Product.ID)
 
-		// Handle different product events based on the type
-		switch generic.Type {
-		case "product.created":
-			var productEvent ProductEvent
-			if err := json.Unmarshal(body, &productEvent); err != nil {
-				log.Printf("Error unmarshaling product event: %v", err)
-				return err
-			}
-
-			log.Printf("Product created: %s", productEvent.Product.Name)
-
-		case "product.updated":
-			var productEvent ProductEvent
-			if err := json.Unmarshal(body, &productEvent); err != nil {
-				log.Printf("Error unmarshaling product event: %v", err)
-				return err
-			}
-
-			log.Printf("Product updated: %s", productEvent.Product.Name)
-
-		case "product.deleted":
-			var productEvent ProductEvent
-			if err := json.Unmarshal(body, &productEvent); err != nil {
-				log.Printf("Error unmarshaling product event: %v", err)
-				return err
-			}
-
-			log.Printf("Product deleted: %s", productEvent.Product.Name)
+		// Create the product in the local database
+		product := localModels.Product{
+			ID: event.Product.ID,
 		}
+
+		if err := dbConn.Create(&product).Error; err != nil {
+			log.Printf("Error creating product in DB: %v", err)
+			return err
+		}
+
+		log.Printf("Successfully created product %d in local database", product.ID)
 
 		return nil
 	})
