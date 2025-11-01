@@ -1,6 +1,6 @@
 module github.com/PayeTonKawa-EPSI-2025/Customers
 
-go 1.25.1
+go 1.25.3
 
 require (
 	github.com/PayeTonKawa-EPSI-2025/Common v0.0.2

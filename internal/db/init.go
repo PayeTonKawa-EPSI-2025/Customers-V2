@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/PayeTonKawa-EPSI-2025/Common/models"
+	localModels "github.com/PayeTonKawa-EPSI-2025/Customers/internal/models"
 )
 
 func Init() *gorm.DB {
@@ -18,7 +19,7 @@ func Init() *gorm.DB {
 		log.Fatal("failed to connect to database:", err)
 	}
 
-	db.AutoMigrate(&models.Customer{})
+	db.AutoMigrate(&models.Customer{}, &localModels.Order{}, &localModels.Product{})
 
 	return db
 }
