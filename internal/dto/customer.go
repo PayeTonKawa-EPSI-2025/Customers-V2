@@ -12,13 +12,14 @@ type CustomerOutput struct {
 	Body models.Customer
 }
 
-type CustomerCreateInput struct {
-	Body struct {
-		Username  string `json:"username"`
-		FirstName string `json:"firstname"`
-		LastName  string `json:"lastname"`
+type CustomerCreateBody struct {
+	Username  string         `json:"username"`
+	FirstName string         `json:"firstname"`
+	LastName  string         `json:"lastname"`
+	Address   models.Address `json:"address"`
+	Company   models.Company `json:"company"`
+}
 
-		Address models.Address `json:"address"`
-		Company models.Company `json:"company"`
-	}
+type CustomerCreateInput struct {
+	Body CustomerCreateBody `json:"body"`
 }
