@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/PayeTonKawa-EPSI-2025/Common/events"
 	"github.com/PayeTonKawa-EPSI-2025/Common/models"
 	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/dto"
 	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/rabbitmq"
@@ -78,7 +79,7 @@ func CreateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, input *d
 	if results.Error == nil {
 		resp.Body = customer
 		if ch != nil {
-			_ = rabbitmq.PublishCustomerEvent(ch, rabbitmq.CustomerCreated, customer) // ignore publish error
+			_ = rabbitmq.PublishCustomerEvent(ch, events.CustomerCreated, customer) // ignore publish error
 		}
 	}
 
@@ -125,7 +126,7 @@ func UpdateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint,
 	resp.Body = customer
 
 	if ch != nil {
-		_ = rabbitmq.PublishCustomerEvent(ch, rabbitmq.CustomerUpdated, customer) // ignore publish error
+		_ = rabbitmq.PublishCustomerEvent(ch, events.CustomerUpdated, customer) // ignore publish error
 	}
 
 	return resp, nil
@@ -143,7 +144,7 @@ func DeleteCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint)
 	if results.Error == nil {
 		// Only publish if channel is not nil
 		if ch != nil {
-			_ = rabbitmq.PublishCustomerEvent(ch, rabbitmq.CustomerDeleted, customer)
+			_ = rabbitmq.PublishCustomerEvent(ch, events.CustomerDeleted, customer)
 		}
 		return nil
 	}
