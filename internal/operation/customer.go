@@ -2,8 +2,11 @@ package operation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/PayeTonKawa-EPSI-2025/Common/events"
@@ -39,19 +42,41 @@ func GetCustomers(ctx context.Context, db *gorm.DB) (*dto.CustomersOutput, error
 func GetCustomer(ctx context.Context, db *gorm.DB, id uint) (*dto.CustomerOutput, error) {
 	resp := &dto.CustomerOutput{}
 
+	// 1️⃣ Fetch customer from local DB
 	var customer models.Customer
 	results := db.First(&customer, id)
-
-	if results.Error == nil {
-		resp.Body = customer
-		return resp, nil
+	if results.Error != nil {
+		if errors.Is(results.Error, gorm.ErrRecordNotFound) {
+			return nil, huma.NewError(http.StatusNotFound, "Customer not found")
+		}
+		return nil, results.Error
 	}
 
-	if errors.Is(results.Error, gorm.ErrRecordNotFound) {
-		return nil, huma.NewError(http.StatusNotFound, "Customer not found")
+	// 2️⃣ Assign basic customer data
+	resp.Body = customer
+
+	// 3️⃣ Fetch orders from Orders service API
+	orders_url := os.Getenv("ORDERS_URL")
+	url := fmt.Sprintf("%s/orders/%d/customers", orders_url, customer.ID)
+	r, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("Failed to fetch orders: %v\n", err)
+		return resp, nil // return customer without orders if API fails
+	}
+	defer r.Body.Close()
+
+	if r.StatusCode == http.StatusOK {
+		var ordersResp dto.OrdersOutputBody
+		if err := json.NewDecoder(r.Body).Decode(&ordersResp); err != nil {
+			fmt.Printf("Failed to decode orders response: %v\n", err)
+		} else {
+			resp.Body.Orders = ordersResp.Orders
+		}
+	} else {
+		fmt.Printf("Orders API returned status %d\n", r.StatusCode)
 	}
 
-	return nil, results.Error
+	return resp, nil
 }
 
 // Create a new customer
