@@ -39,6 +39,18 @@ func (h *OrderEventHandlers) HandleOrderCreated(body []byte) error {
 	}
 
 	log.Printf("Successfully created order %d in local database", order.ID)
+
+	customerOrder := localModels.CustomerOrder{}
+	customerOrder.CustomerID = event.Order.CustomerID
+	customerOrder.OrderID = event.Order.ID
+
+	if err := h.db.Create(&customerOrder).Error; err != nil {
+		log.Printf("Error creating customer order in DB: %v", err)
+		return err
+	}
+
+	log.Printf("Successfully created customer order for customer %d and order %d in local database", event.Order.CustomerID, order.ID)
+
 	return nil
 }
 

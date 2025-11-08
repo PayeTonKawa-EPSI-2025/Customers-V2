@@ -23,3 +23,7 @@ type CustomerCreateBody struct {
 type CustomerCreateInput struct {
 	Body CustomerCreateBody `json:"body"`
 }
+
+type OrdersOutputBody struct {
+	Orders []models.Order `json:"orders"`
+}
