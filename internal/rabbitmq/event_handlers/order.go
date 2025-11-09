@@ -27,11 +27,11 @@ func (h *OrderEventHandlers) HandleOrderCreated(body []byte) error {
 		return err
 	}
 
-	log.Printf("Received order.created event for order %d", event.Order.ID)
+	log.Printf("Received order.created event for order %d", event.Order.OrderID)
 
 	// Create the order in the local database
 	order := localModels.Order{}
-	order.ID = event.Order.ID
+	order.ID = event.Order.OrderID
 
 	if err := h.db.Create(&order).Error; err != nil {
 		log.Printf("Error creating order in DB: %v", err)
@@ -42,7 +42,7 @@ func (h *OrderEventHandlers) HandleOrderCreated(body []byte) error {
 
 	customerOrder := localModels.CustomerOrder{}
 	customerOrder.CustomerID = event.Order.CustomerID
-	customerOrder.OrderID = event.Order.ID
+	customerOrder.OrderID = event.Order.OrderID
 
 	if err := h.db.Create(&customerOrder).Error; err != nil {
 		log.Printf("Error creating customer order in DB: %v", err)
@@ -62,11 +62,11 @@ func (h *OrderEventHandlers) HandleOrderUpdated(body []byte) error {
 		return err
 	}
 
-	log.Printf("Received order.updated event for order %d", event.Order.ID)
+	log.Printf("Received order.updated event for order %d", event.Order.OrderID)
 
 	// Update the order in the local database
 	order := localModels.Order{}
-	order.ID = event.Order.ID
+	order.ID = event.Order.OrderID
 
 	if err := h.db.Save(&order).Error; err != nil {
 		log.Printf("Error updating order in DB: %v", err)
@@ -85,14 +85,14 @@ func (h *OrderEventHandlers) HandleOrderDeleted(body []byte) error {
 		return err
 	}
 
-	log.Printf("Received order.deleted event for order %d", event.Order.ID)
+	log.Printf("Received order.deleted event for order %d", event.Order.OrderID)
 
 	// Delete the order from the local database
-	if err := h.db.Delete(&localModels.Order{}, event.Order.ID).Error; err != nil {
+	if err := h.db.Delete(&localModels.Order{}, event.Order.OrderID).Error; err != nil {
 		log.Printf("Error deleting order from DB: %v", err)
 		return err
 	}
 
-	log.Printf("Successfully deleted order %d from local database", event.Order.ID)
+	log.Printf("Successfully deleted order %d from local database", event.Order.OrderID)
 	return nil
 }

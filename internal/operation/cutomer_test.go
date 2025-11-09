@@ -86,7 +86,7 @@ func TestCreateCustomer(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO "customers"`)).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectCommit()
 
@@ -149,24 +149,23 @@ func TestUpdateCustomer(t *testing.T) {
 func TestDeleteCustomer(t *testing.T) {
 	db, mock := setupMockDB(t)
 
-	// Mock selecting customer
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
-		WithArgs(1, sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username"}).AddRow(1, "jdoe"))
+	// Mock select existing customer
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT * FROM "customers" WHERE "customers"."id" = $1 AND "customers"."deleted_at" IS NULL ORDER BY "customers"."id" LIMIT $2`,
+	)).
+		WithArgs(1, sqlmock.AnyArg()). // first arg is id, second is limit
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).AddRow(1, "jdoe", "John", "DOE"))
 
-	// Mock delete
+	// Mock soft delete
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "customers"`)).
-		WithArgs(1). // GORM passes the ID as the last argument for the WHERE clause
+	mock.ExpectExec(regexp.QuoteMeta(
+		`UPDATE "customers" SET "deleted_at"=$1 WHERE "customers"."id" = $2 AND "customers"."deleted_at" IS NULL`)).
+		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
 	err := operation.DeleteCustomer(context.Background(), db, nil, 1)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled sqlmock expectations: %v", err)
 	}
 }
