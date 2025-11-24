@@ -1,6 +1,7 @@
 services:
   api:
     image: ghcr.io/payetonkawa-epsi-2025/customers/paye-ton-kawa--customers
+    container_name: customers-api
     environment:
       - DATABASE_DSN=postgres://postgresadmin:postgresadmin@database:5432/customers
       - RABBIT_DSN=amqp://guest:guest@rabbit:5672
@@ -9,6 +10,11 @@ services:
     networks:
       - default
       - tpre814_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.customers.rule=Host(`customers.localhost`)"
+      - "traefik.http.routers.customers.entrypoints=web"
+      - "traefik.http.services.customers.loadbalancer.server.port=8081"
   database:
     image: postgres:17.4-alpine
     environment:
