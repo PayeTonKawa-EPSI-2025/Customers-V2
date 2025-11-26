@@ -37,5 +37,5 @@ jobs:
 
       - name: Push Docker image
         run: |
-          docker push ghcr.io/payetonkawa-epsi-2025/customers-V2/paye-ton-kawa--customers:${{ github.event.inputs.version }}
-          docker push ghcr.io/payetonkawa-epsi-2025/customers-V2/paye-ton-kawa--customers:latest
+          docker push ghcr.io/payetonkawa-epsi-2025/customers-v2/paye-ton-kawa--customers:${{ github.event.inputs.version }}
+          docker push ghcr.io/payetonkawa-epsi-2025/customers-v2/paye-ton-kawa--customers:latest
