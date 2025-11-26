@@ -1,7 +1,7 @@
 package rabbitmq
 
 import (
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/rabbitmq/event_handlers"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/rabbitmq/event_handlers"
 	"gorm.io/gorm"
 )
 

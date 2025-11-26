@@ -1,12 +1,11 @@
-module github.com/PayeTonKawa-EPSI-2025/Customers
+module github.com/PayeTonKawa-EPSI-2025/Customers-V2
 
 go 1.25.3
 
 require (
-	github.com/PayeTonKawa-EPSI-2025/Common v0.0.2
+	github.com/PayeTonKawa-EPSI-2025/Common-V2 v1.0.0
 	github.com/danielgtaylor/huma/v2 v2.34.1
 	github.com/go-chi/chi/v5 v5.2.3
-	github.com/go-chi/metrics v0.1.1
 	github.com/joho/godotenv v1.5.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rabbitmq/amqp091-go v1.10.0

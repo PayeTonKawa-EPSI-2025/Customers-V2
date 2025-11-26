@@ -1,6 +1,6 @@
 services:
   api:
-    image: ghcr.io/payetonkawa-epsi-2025/customers/paye-ton-kawa--customers
+    image: ghcr.io/payetonkawa-epsi-2025/customers-V2/paye-ton-kawa--customers
     container_name: customers-api
     environment:
       - DATABASE_DSN=postgres://postgresadmin:postgresadmin@database:5432/customers

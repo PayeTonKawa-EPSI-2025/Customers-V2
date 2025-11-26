@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/PayeTonKawa-EPSI-2025/Common/events"
-	localModels "github.com/PayeTonKawa-EPSI-2025/Customers/internal/models"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/events"
+	localModels "github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/models"
 	"gorm.io/gorm"
 )
 

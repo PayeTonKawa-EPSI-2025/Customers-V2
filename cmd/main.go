@@ -7,17 +7,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/db"
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/operation"
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/rabbitmq"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/rabbitmq"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 

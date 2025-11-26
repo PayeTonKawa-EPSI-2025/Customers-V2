@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/PayeTonKawa-EPSI-2025/Common/events"
-	"github.com/PayeTonKawa-EPSI-2025/Common/models"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/events"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

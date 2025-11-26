@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/PayeTonKawa-EPSI-2025/Common/models"
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/dto"
-	"github.com/PayeTonKawa-EPSI-2025/Customers/internal/operation"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/dto"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
