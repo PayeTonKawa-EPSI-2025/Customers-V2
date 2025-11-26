@@ -15,7 +15,8 @@ import (
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/metrics"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
@@ -52,20 +53,52 @@ func main() {
 		router.Use(middleware.Recoverer)
 		router.Use(middleware.Compress(5))
 
-		router.Use(metrics.Collector(metrics.CollectorOpts{
-			Host:  false,
-			Proto: true,
-			Skip: func(r *http.Request) bool {
-				return r.Method != "OPTIONS"
+		// Prometheus instrumentation (counter + histogram)
+		httpRequests := prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "http_requests_total",
+				Help: "Total HTTP requests",
 			},
-		}))
+			[]string{"path", "method", "status"},
+		)
 
-		router.Handle("/metrics", metrics.Handler())
+		httpRequestDuration := prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "http_request_duration_seconds",
+				Help:    "HTTP request duration in seconds",
+				Buckets: prometheus.DefBuckets,
+			},
+			[]string{"path", "method"},
+		)
+
+		prometheus.MustRegister(httpRequests, httpRequestDuration)
+
+		// middleware to observe requests
+		prometheusMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				start := time.Now()
+				rw := &statusRecorder{ResponseWriter: w, status: 200}
+				next.ServeHTTP(rw, r)
+				dur := time.Since(start).Seconds()
+				path := r.URL.Path
+				httpRequests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", rw.status)).Inc()
+				httpRequestDuration.WithLabelValues(path, r.Method).Observe(dur)
+			})
+		}
+
+		router.Use(prometheusMiddleware)
+		router.Handle("/metrics", promhttp.Handler())
 
 		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
 		api := humachi.New(router, configs)
 
 		operation.RegisterCustomerRoutes(api, dbConn, ch)
+
+		// Debug endpoints for testing/metrics
+		router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
+			// return an internal server error to create 5xx metrics
+			http.Error(w, "debug 500", http.StatusInternalServerError)
+		})
 
 		// Create the HTTP server.
 		server := http.Server{
@@ -93,4 +126,15 @@ func main() {
 
 	// Run the CLI. When passed no commands, it starts the server.
 	cli.Run()
+}
+
+// statusRecorder is a small helper to capture HTTP status codes from handlers.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
 }
