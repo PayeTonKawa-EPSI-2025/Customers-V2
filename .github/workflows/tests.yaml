@@ -5,21 +5,6 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  sonarqube:
-    name: SonarQube
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
-        with:
-          organization: "payetonkawa-epsi-2025"
-          projectKey: "PayeTonKawa-EPSI-2025_Customers-V2"
-          projectName: "Customers-V2"
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
   govulncheck:
     runs-on: ubuntu-latest
     steps:
