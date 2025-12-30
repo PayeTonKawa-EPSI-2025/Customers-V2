@@ -31,10 +31,8 @@ jobs:
 
       - name: Run govulncheck
         run: |
-          for svc in service-a service-b service-c; do
-            echo "Checking $svc"
-            (cd $svc && govulncheck ./...)
-          done
+          echo "🔍 Running govulncheck for this service"
+          govulncheck ./...
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
