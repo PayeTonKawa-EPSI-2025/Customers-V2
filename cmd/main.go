@@ -35,25 +35,50 @@ func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
 
+	disableRabbit := os.Getenv("DISABLE_RABBITMQ") == "true"
+
+	if disableRabbit {
+		log.Println("DISABLE_RABBITMQ=true → starting CI server")
+
+		router := chi.NewMux()
+
+		// Health endpoint (used by GitHub Actions)
+		router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+
+		// Register API routes WITHOUT RabbitMQ
+		configs := huma.DefaultConfig("Customers CI", "1.0.0")
+		api := humachi.New(router, configs)
+		operation.RegisterCustomerRoutes(api, dbConn, nil)
+
+		server := &http.Server{
+			Addr:    ":8080",
+			Handler: router,
+		}
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("CI server failed: %v", err)
+			}
+		}()
+
+		// Keep process alive for Postman tests
+		select {}
+	}
+
 	var conn *amqp.Connection
 	var ch *amqp.Channel
+	conn, ch = rabbitmq.Connect()
 
-	disableRabbit := os.Getenv("DISABLE_RABBITMQ") == "true"
-	if !disableRabbit {
-		conn, ch = rabbitmq.Connect()
+	// Set up event handlers
+	eventRouter := rabbitmq.SetupEventHandlers(dbConn)
 
-		// Set up event handlers
-		eventRouter := rabbitmq.SetupEventHandlers(dbConn)
-
-		// Start listening for events
-		_, err := rabbitmq.StartListening(ch, eventRouter)
-		if err != nil {
-			log.Fatalf("Failed to start event listener: %v", err)
-		}
-	} else {
-		log.Println("DISABLE_RABBITMQ=true, skipping RabbitMQ connection")
-		conn = nil
-		ch = nil
+	// Start listening for events
+	_, err := rabbitmq.StartListening(ch, eventRouter)
+	if err != nil {
+		log.Fatalf("Failed to start event listener: %v", err)
 	}
 
 	// Create a CLI app which takes a port option.
@@ -104,7 +129,7 @@ func main() {
 		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
 		api := humachi.New(router, configs)
 
-		// operation.RegisterCustomerRoutes(api, dbConn, ch)
+		operation.RegisterCustomerRoutes(api, dbConn, ch)
 
 		// Debug endpoints for testing/metrics
 		router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
