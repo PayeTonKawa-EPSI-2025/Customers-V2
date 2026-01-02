@@ -100,12 +100,16 @@ func TestDBConnectAndSeed(t *testing.T) {
 
 	// Run a simple query to verify data
 	var count int
-	err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM users").Scan(&count)
+	err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM customers").Scan(&count)
 	if err != nil {
-		t.Fatalf("failed to count users: %v", err)
+		t.Fatalf("failed to count customers: %v", err)
 	}
 
 	if count != 2 {
 		t.Errorf("expected 2 customers, got %d", count)
 	}
+
+	t.Cleanup(func() {
+		pool.Exec(context.Background(), "TRUNCATE TABLE IF EXISTS customers")
+	})
 }
