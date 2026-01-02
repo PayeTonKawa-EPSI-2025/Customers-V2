@@ -26,6 +26,7 @@ jobs:
 
     env:
       DATABASE_DSN: postgresql://test:test@localhost:5432/testdb
+      DISABLE_RABBITMQ: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -40,17 +41,17 @@ jobs:
             sleep 1
           done
 
-      - name: Run Go service
-        run: |
-          go run ./cmd/main.go &   # run in background
-          echo $! > go.pid
-
       - name: Wait for Go service
         run: |
-          echo "Waiting for Go service on port 8080..."
-          until curl -s http://localhost:8080/health; do
-          sleep 1
+          for i in {1..30}; do
+            if curl -sf http://localhost:8080/health; then
+                echo "Go service is up!"
+                exit 0
+            fi
+            sleep 2
           done
+          echo "Go service failed to start in time"
+          exit 1
 
       - name: Install Postman CLI
         run: |

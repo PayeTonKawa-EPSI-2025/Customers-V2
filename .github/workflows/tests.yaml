@@ -45,6 +45,7 @@ jobs:
 
     env:
       DATABASE_DSN: postgresql://test:test@localhost:5432/testdb
+      DISABLE_RABBITMQ: "true"
 
     steps:
       - uses: actions/checkout@v4
