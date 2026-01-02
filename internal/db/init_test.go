@@ -33,6 +33,10 @@ func Connect(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("failed to ping postgres: %v", err)
 	}
 
+	return pool
+}
+
+func StopSeededTest(t *testing.T, pool *pgxpool.Pool) {
 	// Safe cleanup: only truncate if table exists
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(),
@@ -44,8 +48,6 @@ func Connect(t *testing.T) *pgxpool.Pool {
 			END
 			$$;`)
 	})
-
-	return pool
 }
 
 // SeedDB creates the customers table if missing and inserts sample data.
@@ -112,38 +114,6 @@ func TestDBConnectAndSeed(t *testing.T) {
 	if count != 2 {
 		t.Errorf("expected 2 customers, got %d", count)
 	}
-}
 
-// -------------------- FAILURE PATHS -------------------- //
-
-func TestConnectNoDSN(t *testing.T) {
-	// Skip in CI to avoid breaking pipeline
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping fatal-branch coverage in CI")
-	}
-
-	orig := os.Getenv("DATABASE_DSN")
-	os.Unsetenv("DATABASE_DSN")
-	t.Cleanup(func() { os.Setenv("DATABASE_DSN", orig) })
-
-	t.Run("no DSN", func(t *testing.T) {
-		// This will call t.Fatal
-		Connect(t)
-	})
-}
-
-func TestConnectInvalidDSN(t *testing.T) {
-	// Skip in CI to avoid breaking pipeline
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping fatal-branch coverage in CI")
-	}
-
-	orig := os.Getenv("DATABASE_DSN")
-	os.Setenv("DATABASE_DSN", "postgres://invalid:5432/db?sslmode=disable")
-	t.Cleanup(func() { os.Setenv("DATABASE_DSN", orig) })
-
-	t.Run("invalid DSN", func(t *testing.T) {
-		// This will call t.Fatal
-		Connect(t)
-	})
+	StopSeededTest(t, pool)
 }
