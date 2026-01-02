@@ -27,6 +27,7 @@ jobs:
     env:
       DATABASE_DSN: postgresql://test:test@localhost:5432/testdb
       DISABLE_RABBITMQ: "true"
+      POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -48,12 +49,13 @@ jobs:
 
       - name: Wait for Go service
         run: |
-          for i in {1..60}; do
-            if curl -sf http://localhost:8080/health; then
-                echo "Go service is up!"
-                exit 0
-            fi
-            sleep 2
+          for i in {1..30}; do
+          echo "Checking Go service (attempt $i)..."
+          if curl -sf http://localhost:8080/health; then
+              echo "Go service is up!"
+              exit 0
+          fi
+          sleep 2
           done
           echo "Go service failed to start in time"
           exit 1
@@ -62,7 +64,7 @@ jobs:
         run: |
           curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
       - name: Login to Postman CLI
-        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
+        run: postman login --with-api-key "$POSTMAN_API_KEY"
       - name: Run API tests
         run: |
           postman collection run "25203538-5f6aaf3d-954b-475c-9f3e-9d0c25e788c4" -e "25203538-cbf0eac1-eaa6-4025-b3fb-0e8cf1821a1a"
