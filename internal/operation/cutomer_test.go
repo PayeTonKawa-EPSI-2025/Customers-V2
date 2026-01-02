@@ -2,6 +2,7 @@ package operation_test
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 
@@ -56,6 +57,44 @@ func TestGetCustomers(t *testing.T) {
 	}
 }
 
+func TestGetCustomersDBError(t *testing.T) {
+	db, mock := setupMockDB(t)
+
+	mock.ExpectQuery(`SELECT \* FROM "customers"`).
+		WillReturnError(errors.New("db failure"))
+
+	_, err := operation.GetCustomers(context.Background(), db)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestGetCustomerOK(t *testing.T) {
+	db, mock := setupMockDB(t)
+
+	rows := sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).
+		AddRow(1, "jdoe", "John", "DOE")
+
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT * FROM "customers" WHERE "customers"."id" = $1 AND "customers"."deleted_at" IS NULL ORDER BY "customers"."id" LIMIT $2`,
+	)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnRows(rows)
+
+	resp, err := operation.GetCustomer(context.Background(), db, 1)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if resp.Body.Username != "jdoe" {
+		t.Errorf("expected username 'jdoe', got '%s'", resp.Body.Username)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled sqlmock expectations: %v", err)
+	}
+}
+
 func TestGetCustomerNotFound(t *testing.T) {
 	db, mock := setupMockDB(t)
 
@@ -66,6 +105,25 @@ func TestGetCustomerNotFound(t *testing.T) {
 	_, err := operation.GetCustomer(context.Background(), db, 1)
 	if err == nil {
 		t.Fatal("expected error for non-existent customer")
+	}
+}
+
+func TestGetCustomerDBError(t *testing.T) {
+	db, mock := setupMockDB(t)
+
+	mock.ExpectQuery(regexp.QuoteMeta(
+		`SELECT * FROM "customers" WHERE "customers"."id" = $1 AND "customers"."deleted_at" IS NULL ORDER BY "customers"."id" LIMIT $2`,
+	)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnError(errors.New("db failure"))
+
+	_, err := operation.GetCustomer(context.Background(), db, 1)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled sqlmock expectations: %v", err)
 	}
 }
 
@@ -143,6 +201,18 @@ func TestUpdateCustomer(t *testing.T) {
 
 	if resp.Body.Username != "jdoe2" {
 		t.Errorf("expected username 'jdoe2', got '%s'", resp.Body.Username)
+	}
+}
+
+func TestUpdateCustomerNotFound(t *testing.T) {
+	db, mock := setupMockDB(t)
+
+	mock.ExpectQuery(`SELECT \* FROM "customers"`).
+		WillReturnError(gorm.ErrRecordNotFound)
+
+	_, err := operation.UpdateCustomer(context.Background(), db, nil, 1, dto.CustomerCreateInput{})
+	if err == nil {
+		t.Fatal("expected not found error")
 	}
 }
 

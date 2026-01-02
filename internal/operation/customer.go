@@ -20,6 +20,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var httpGet = http.Get // default http.Get, can be overridden in tests
+
 // ----------------------
 // Extracted CRUD Functions
 // ----------------------
@@ -58,7 +60,7 @@ func GetCustomer(ctx context.Context, db *gorm.DB, id uint) (*dto.CustomerOutput
 	// 3️⃣ Fetch orders from Orders service API
 	orders_url := os.Getenv("ORDERS_URL")
 	url := fmt.Sprintf("%s/orders/%d/customers", orders_url, customer.ID)
-	r, err := http.Get(url)
+	r, err := httpGet(url)
 	if err != nil {
 		fmt.Printf("Failed to fetch orders: %v\n", err)
 		return resp, nil // return customer without orders if API fails
@@ -181,6 +183,22 @@ func DeleteCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint)
 // Register routes with Huma
 // ----------------------
 func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
+	// ----------------------
+	// Health endpoint
+	// ----------------------
+	huma.Register(api, huma.Operation{
+		OperationID: "health",
+		Summary:     "Health check endpoint",
+		Method:      http.MethodGet,
+		Path:        "/health",
+		Tags:        []string{"health"},
+	}, func(ctx context.Context, input *struct{}) (*struct {
+		Message string `json:"message"`
+	}, error) {
+		return &struct {
+			Message string `json:"message"`
+		}{Message: "ok"}, nil
+	})
 
 	huma.Register(api, huma.Operation{
 		OperationID: "get-customers",
