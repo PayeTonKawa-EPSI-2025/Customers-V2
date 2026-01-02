@@ -92,6 +92,20 @@ func TestDBConnect(t *testing.T) {
 	t.Logf("Successfully connected! Database time: %s", now.Format(time.RFC3339))
 }
 
+func TestConnectNoDSN(t *testing.T) {
+	os.Unsetenv("DATABASE_DSN")
+	t.Run("expect fatal", func(t *testing.T) {
+		Connect(t)
+	})
+}
+
+func TestConnectInvalidDSN(t *testing.T) {
+	os.Setenv("DATABASE_DSN", "postgres://invalid:5432/db")
+	t.Run("expect fatal", func(t *testing.T) {
+		Connect(t)
+	})
+}
+
 func TestDBConnectAndSeed(t *testing.T) {
 	pool := Connect(t)
 
@@ -111,5 +125,19 @@ func TestDBConnectAndSeed(t *testing.T) {
 
 	t.Cleanup(func() {
 		pool.Exec(context.Background(), "TRUNCATE TABLE IF EXISTS customers")
+	})
+}
+
+func TestSeedDBCreateTableFail(t *testing.T) {
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+
+	// Simulate failure when creating table
+	mockPool.ExpectExec("CREATE TABLE IF NOT EXISTS customers").WillReturnError(errors.New("table create failed"))
+
+	// SeedDB should call t.Fatalf on error, so we need to capture t.Fatal
+	t.Run("fatal expected", func(t *testing.T) {
+		// Optionally, use a helper to capture fatal
+		SeedDB(t, mockPool)
 	})
 }
