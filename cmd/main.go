@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
-	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/rabbitmq"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -105,7 +104,7 @@ func main() {
 		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
 		api := humachi.New(router, configs)
 
-		operation.RegisterCustomerRoutes(api, dbConn, ch)
+		// operation.RegisterCustomerRoutes(api, dbConn, ch)
 
 		// Debug endpoints for testing/metrics
 		router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
