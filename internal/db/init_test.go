@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pashagolub/pgxmock"
+	"github.com/stretchr/testify/require"
 )
 
 // SeedDB inserts initial data for testing
