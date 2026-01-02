@@ -12,9 +12,9 @@ import (
 func Connect(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv("DATABASE_DSN")
 	if dsn == "" {
-		t.Fatal("DATABASE_URL is not set")
+		t.Fatal("DATABASE_DSN is not set")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -36,4 +36,8 @@ func Connect(t *testing.T) *pgxpool.Pool {
 	})
 
 	return pool
+}
+
+func TestDBConnect(t *testing.T) {
+	pool := Connect(t)
 }

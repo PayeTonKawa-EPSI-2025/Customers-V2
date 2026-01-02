@@ -44,7 +44,7 @@ jobs:
           --health-retries=5
 
     env:
-      DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+      DATABASE_DSN: postgresql://test:test@localhost:5432/testdb
 
     steps:
       - uses: actions/checkout@v4
@@ -60,4 +60,4 @@ jobs:
           done
 
       - name: Run tests
-        run: go test -count=1 ./...
+        run: go test -count=1 ./... -cover
