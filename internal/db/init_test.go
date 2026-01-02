@@ -40,4 +40,13 @@ func Connect(t *testing.T) *pgxpool.Pool {
 
 func TestDBConnect(t *testing.T) {
 	pool := Connect(t)
+
+	// Run a simple query to use pool
+	var now string
+	err := pool.QueryRow(context.Background(), "SELECT NOW()").Scan(&now)
+	if err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+
+	t.Logf("Successfully connected! Database time: %s", now)
 }
