@@ -6,12 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"Customers-V2/internal/db" // <-- import the package containing Init
+
 	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // SeedDB inserts initial data for testing
 func SeedDB(t *testing.T, pool *pgxpool.Pool) {
+	db.Init()
+
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
