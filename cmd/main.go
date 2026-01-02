@@ -121,7 +121,11 @@ func main() {
 
 		// Tell the CLI how to start your router.
 		hooks.OnStart(func() {
-			server.ListenAndServe()
+			go func() {
+				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Fatalf("HTTP server failed: %v", err)
+				}
+			}()
 		})
 
 		// Tell the CLI how to stop your server.
@@ -132,8 +136,12 @@ func main() {
 			server.Shutdown(ctx)
 
 			// Close the RabbitMQ connection when server shuts down
-			conn.Close()
-			ch.Close()
+			if conn != nil {
+				_ = conn.Close()
+			}
+			if ch != nil {
+				_ = ch.Close()
+			}
 		})
 	})
 
