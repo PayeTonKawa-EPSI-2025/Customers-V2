@@ -44,7 +44,7 @@ jobs:
 
       - name: Run Go service
         run: |
-          go run ./cmd/main.go &   # run in background
+          go run ./cmd/main.go -p 8080 &   # run in background
           echo $! > go.pid
 
       - name: Install Postman CLI
