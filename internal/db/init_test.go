@@ -40,10 +40,10 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 
 	for _, u := range customers {
 		_, err := pool.Exec(ctx, `
-			INSERT INTO customers (username, firstName, lastName, name) VALUES ($1, $2, $3, $4)
+			INSERT INTO customers (username, first_name, last_name, name) VALUES ($1, $2, $3, $4)
 		`, u.Username, u.FirstName, u.LastName, u.Name)
 		if err != nil {
-			t.Fatalf("failed to insert user %s: %v", u.Username, err)
+			t.Fatalf("failed to insert customer %s: %v", u.Username, err)
 		}
 	}
 
