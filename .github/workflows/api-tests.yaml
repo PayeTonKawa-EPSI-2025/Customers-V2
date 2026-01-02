@@ -42,10 +42,6 @@ jobs:
             sleep 1
           done
 
-      - name: Build Go service
-        run: |
-          go build
-
       - name: Run Go service
         run: |
           go run ./cmd/main.go &   # run in background
