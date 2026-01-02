@@ -31,8 +31,8 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 
 	// Example: Insert sample data
 	clients := []models.Customer{
-		{"Alice", "Alice", "Smith", "Alice Smith"},
-		{"Bob", "Bob", "Johnson", "Bob Johnson"},
+		{Username: "Alice", FirstName: "Alice", LastName: "Smith", Name: "Alice Smith"},
+		{Username: "Bob", FirstName: "Bob", LastName: "Johnson", Name: "Bob Johnson"},
 	}
 
 	for _, u := range clients {
