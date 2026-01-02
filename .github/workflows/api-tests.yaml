@@ -42,8 +42,15 @@ jobs:
 
       - name: Run Go service
         run: |
-          go run ./cmd/main &
-          sleep 5
+          go run ./cmd/main &   # run in background
+          echo $! > go.pid
+
+      - name: Wait for Go service
+        run: |
+          echo "Waiting for Go service on port 8080..."
+          until curl -s http://localhost:8080/health; do
+          sleep 1
+          done
 
       - name: Install Postman CLI
         run: |
