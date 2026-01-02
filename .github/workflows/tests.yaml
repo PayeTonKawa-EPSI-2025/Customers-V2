@@ -25,50 +25,48 @@ jobs:
 
       - name: Run govulncheck
         run: govulncheck ./...
-  unit-tests:
-    name: Unit Tests
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+          -c fsync=off
+          -c synchronous_commit=off
+          -c full_page_writes=off
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Installation de Go
+      - name: Go install
         uses: actions/setup-go@v5
         with:
           go-version: "1.25"
 
-      - name: Téléchargement des dépendances
+      - name: Download Go dependencies
         run: go mod download
 
-      - name: Lancer les tests
-        run: go test ./... -cover
-
-  automated-api-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25"
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Docker image
-        run: make build-image VERSION=${{ github.event.inputs.version }}
-
-      - name: Install Postman CLI
+      - name: Wait for Postgres
         run: |
-          curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
-      - name: Login to Postman CLI
-        run: postman login --with-api-key ${{ secrets.POSTMAN_API_KEY }}
-      - name: Run API tests
+          until pg_isready -h localhost -p 5432 -U test; do
+            sleep 1
+          done
+
+      - name: Run migrations
         run: |
-          postman collection run "25203538-5f6aaf3d-954b-475c-9f3e-9d0c25e788c4" -e "25203538-cbf0eac1-eaa6-4025-b3fb-0e8cf1821a1a"
+          migrate -database "$DATABASE_URL" -path migrations up
+
+      - name: Run tests
+        run: |
+          go test -race -count=1 ./... -cover
