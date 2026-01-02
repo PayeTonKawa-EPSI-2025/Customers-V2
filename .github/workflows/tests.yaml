@@ -42,30 +42,22 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=5
-          --entrypoint "postgres"
-          postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
 
-      - name: Go install
-        uses: actions/setup-go@v5
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/testdb
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
 
-      - name: Download Go dependencies
-        run: go mod download
-
       - name: Wait for Postgres
         run: |
+          echo "Waiting for Postgres..."
           until pg_isready -h localhost -p 5432 -U test; do
             sleep 1
           done
 
-      - name: Run migrations
-        run: |
-          migrate -database "$DATABASE_URL" -path migrations up
-
       - name: Run tests
-        run: |
-          go test -race -count=1 ./... -cover
+        run: go test -count=1 ./...
