@@ -30,14 +30,14 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 	}
 
 	// Example: Insert sample data
-	clients := []models.Customer{
+	customers := []models.Customer{
 		{Username: "Alice", FirstName: "Alice", LastName: "Smith", Name: "Alice Smith"},
 		{Username: "Bob", FirstName: "Bob", LastName: "Johnson", Name: "Bob Johnson"},
 	}
 
-	for _, u := range clients {
+	for _, u := range customers {
 		_, err := pool.Exec(ctx, `
-			INSERT INTO clients (username, firstName, lastName, name) VALUES ($1, $2, $3, $4)
+			INSERT INTO customers (username, firstName, lastName, name) VALUES ($1, $2, $3, $4)
 		`, u.Username, u.FirstName, u.LastName, u.Name)
 		if err != nil {
 			t.Fatalf("failed to insert user %s: %v", u.Username, err)
