@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
@@ -33,15 +34,23 @@ var (
 func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
-	conn, ch := rabbitmq.Connect()
 
-	// Set up event handlers
-	eventRouter := rabbitmq.SetupEventHandlers(dbConn)
+	var conn *rabbitmq.ConnectionType
+	var ch *rabbitmq.ChannelType
+	disableRabbit := os.Getenv("DISABLE_RABBITMQ") == "true"
+	if !disableRabbit {
+		conn, ch = rabbitmq.Connect()
 
-	// Start listening for events
-	_, err := rabbitmq.StartListening(ch, eventRouter)
-	if err != nil {
-		log.Fatalf("Failed to start event listener: %v", err)
+		// Set up event handlers
+		eventRouter := rabbitmq.SetupEventHandlers(dbConn)
+
+		// Start listening for events
+		_, err := rabbitmq.StartListening(ch, eventRouter)
+		if err != nil {
+			log.Fatalf("Failed to start event listener: %v", err)
+		}
+	} else {
+		log.Println("DISABLE_RABBITMQ=true, skipping RabbitMQ connection")
 	}
 
 	// Create a CLI app which takes a port option.
