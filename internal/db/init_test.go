@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"Customers-V2/internal/db" // <-- import the package containing Init
-
 	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
