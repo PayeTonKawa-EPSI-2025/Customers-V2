@@ -42,7 +42,7 @@ jobs:
 
       - name: Run Go service
         run: |
-          go run ./cmd/main &   # run in background
+          go run ./cmd/main.go &   # run in background
           echo $! > go.pid
 
       - name: Wait for Go service
