@@ -70,99 +70,143 @@ func main() {
 
 	var conn *amqp.Connection
 	var ch *amqp.Channel
+
 	conn, ch = rabbitmq.Connect()
 
-	// Set up event handlers
 	eventRouter := rabbitmq.SetupEventHandlers(dbConn)
-
-	// Start listening for events
-	_, err := rabbitmq.StartListening(ch, eventRouter)
-	if err != nil {
-		log.Fatalf("Failed to start event listener: %v", err)
+	if _, err := rabbitmq.StartListening(ch, eventRouter); err != nil {
+		log.Fatalf("Failed to start RabbitMQ listener: %v", err)
 	}
 
-	// Create a CLI app which takes a port option.
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		// Create a new router & API
-		router := chi.NewMux()
 
+		router := chi.NewMux()
 		router.Use(middleware.Logger)
 		router.Use(middleware.Recoverer)
-		router.Use(middleware.Compress(5))
-
-		// Prometheus instrumentation (counter + histogram)
-		httpRequests := prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "http_requests_total",
-				Help: "Total HTTP requests",
-			},
-			[]string{"path", "method", "status"},
-		)
-
-		httpRequestDuration := prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "http_request_duration_seconds",
-				Help:    "HTTP request duration in seconds",
-				Buckets: prometheus.DefBuckets,
-			},
-			[]string{"path", "method"},
-		)
-
-		prometheus.MustRegister(httpRequests, httpRequestDuration)
-
-		// middleware to observe requests
-		prometheusMiddleware := func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				start := time.Now()
-				rw := &statusRecorder{ResponseWriter: w, status: 200}
-				next.ServeHTTP(rw, r)
-				dur := time.Since(start).Seconds()
-				path := r.URL.Path
-				httpRequests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", rw.status)).Inc()
-				httpRequestDuration.WithLabelValues(path, r.Method).Observe(dur)
-			})
-		}
-
-		router.Use(prometheusMiddleware)
-		router.Handle("/metrics", promhttp.Handler())
 
 		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
 		api := humachi.New(router, configs)
 
 		operation.RegisterCustomerRoutes(api, dbConn, ch)
 
-		// Debug endpoints for testing/metrics
-		router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
-			// return an internal server error to create 5xx metrics
-			http.Error(w, "debug 500", http.StatusInternalServerError)
-		})
-
-		// Create the HTTP server.
-		server := http.Server{
+		server := &http.Server{
 			Addr:    fmt.Sprintf(":%d", options.Port),
 			Handler: router,
 		}
 
-		// Tell the CLI how to start your router.
 		hooks.OnStart(func() {
-			server.ListenAndServe()
+			log.Printf("Starting server on :%d\n", options.Port)
+			go server.ListenAndServe()
 		})
 
-		// Tell the CLI how to stop your server.
 		hooks.OnStop(func() {
-			// Give the server 5 seconds to gracefully shut down, then give up.
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			server.Shutdown(ctx)
-
-			// Close the RabbitMQ connection when server shuts down
 			conn.Close()
 			ch.Close()
 		})
 	})
 
-	// Run the CLI. When passed no commands, it starts the server.
 	cli.Run()
+
+	/*
+		var conn *amqp.Connection
+		var ch *amqp.Channel
+		conn, ch = rabbitmq.Connect()
+
+		// Set up event handlers
+		eventRouter := rabbitmq.SetupEventHandlers(dbConn)
+
+		// Start listening for events
+		_, err := rabbitmq.StartListening(ch, eventRouter)
+		if err != nil {
+			log.Fatalf("Failed to start event listener: %v", err)
+		}
+
+		// Create a CLI app which takes a port option.
+		cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
+			// Create a new router & API
+			router := chi.NewMux()
+
+			router.Use(middleware.Logger)
+			router.Use(middleware.Recoverer)
+			router.Use(middleware.Compress(5))
+
+			// Prometheus instrumentation (counter + histogram)
+			httpRequests := prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "http_requests_total",
+					Help: "Total HTTP requests",
+				},
+				[]string{"path", "method", "status"},
+			)
+
+			httpRequestDuration := prometheus.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Name:    "http_request_duration_seconds",
+					Help:    "HTTP request duration in seconds",
+					Buckets: prometheus.DefBuckets,
+				},
+				[]string{"path", "method"},
+			)
+
+			prometheus.MustRegister(httpRequests, httpRequestDuration)
+
+			// middleware to observe requests
+			prometheusMiddleware := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					start := time.Now()
+					rw := &statusRecorder{ResponseWriter: w, status: 200}
+					next.ServeHTTP(rw, r)
+					dur := time.Since(start).Seconds()
+					path := r.URL.Path
+					httpRequests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", rw.status)).Inc()
+					httpRequestDuration.WithLabelValues(path, r.Method).Observe(dur)
+				})
+			}
+
+			router.Use(prometheusMiddleware)
+			router.Handle("/metrics", promhttp.Handler())
+
+			configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+			api := humachi.New(router, configs)
+
+			operation.RegisterCustomerRoutes(api, dbConn, ch)
+
+			// Debug endpoints for testing/metrics
+			router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
+				// return an internal server error to create 5xx metrics
+				http.Error(w, "debug 500", http.StatusInternalServerError)
+			})
+
+			// Create the HTTP server.
+			server := http.Server{
+				Addr:    fmt.Sprintf(":%d", options.Port),
+				Handler: router,
+			}
+
+			// Tell the CLI how to start your router.
+			hooks.OnStart(func() {
+				server.ListenAndServe()
+			})
+
+			// Tell the CLI how to stop your server.
+			hooks.OnStop(func() {
+				// Give the server 5 seconds to gracefully shut down, then give up.
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				server.Shutdown(ctx)
+
+				// Close the RabbitMQ connection when server shuts down
+				conn.Close()
+				ch.Close()
+			})
+		})
+
+		// Run the CLI. When passed no commands, it starts the server.
+		cli.Run()
+	*/
 }
 
 // statusRecorder is a small helper to capture HTTP status codes from handlers.
