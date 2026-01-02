@@ -35,8 +35,9 @@ func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
 
-	var conn *rabbitmq.ConnectionType
-	var ch *rabbitmq.ChannelType
+	var conn *amqp.Connection
+	var ch *amqp.Channel
+
 	disableRabbit := os.Getenv("DISABLE_RABBITMQ") == "true"
 	if !disableRabbit {
 		conn, ch = rabbitmq.Connect()
@@ -51,6 +52,8 @@ func main() {
 		}
 	} else {
 		log.Println("DISABLE_RABBITMQ=true, skipping RabbitMQ connection")
+		conn = nil
+		ch = nil
 	}
 
 	// Create a CLI app which takes a port option.
