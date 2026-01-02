@@ -6,8 +6,46 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// SeedDB inserts initial data for testing
+func SeedDB(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Example: Create table if not exists
+	_, err := pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			email TEXT NOT NULL UNIQUE,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	// Example: Insert sample data
+	clients := []models.Customer{
+		{"Alice", "Alice", "Smith", "Alice Smith"},
+		{"Bob", "Bob", "Johnson", "Bob Johnson"},
+	}
+
+	for _, u := range clients {
+		_, err := pool.Exec(ctx, `
+			INSERT INTO clients (username, firstName, lastName, name) VALUES ($1, $2, $3, $4)
+		`, u.Username, u.FirstName, u.LastName, u.Name)
+		if err != nil {
+			t.Fatalf("failed to insert user %s: %v", u.Username, err)
+		}
+	}
+
+	t.Log("Database seeded successfully")
+}
 
 func Connect(t *testing.T) *pgxpool.Pool {
 	t.Helper()
@@ -49,4 +87,22 @@ func TestDBConnect(t *testing.T) {
 	}
 
 	t.Logf("Successfully connected! Database time: %s", now.Format(time.RFC3339))
+}
+
+func TestDBConnectAndSeed(t *testing.T) {
+	pool := Connect(t)
+
+	// Seed the database
+	SeedDB(t, pool)
+
+	// Run a simple query to verify data
+	var count int
+	err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM users").Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to count users: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("expected 2 customers, got %d", count)
+	}
 }
