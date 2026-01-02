@@ -119,12 +119,15 @@ func main() {
 			Handler: router,
 		}
 
+		done := make(chan struct{})
+
 		// Tell the CLI how to start your router.
 		hooks.OnStart(func() {
 			go func() {
 				if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					log.Fatalf("HTTP server failed: %v", err)
 				}
+				close(done)
 			}()
 		})
 
