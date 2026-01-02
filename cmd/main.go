@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
+	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/rabbitmq"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -35,40 +36,11 @@ func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
 
+	var conn *amqp.Connection
+	var ch *amqp.Channel
+
 	disableRabbit := os.Getenv("DISABLE_RABBITMQ") == "true"
-
-	if disableRabbit {
-		log.Println("DISABLE_RABBITMQ=true → starting CI server")
-
-		router := chi.NewMux()
-
-		// Health endpoint (used by GitHub Actions)
-		router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
-		})
-
-		// Register API routes WITHOUT RabbitMQ
-		configs := huma.DefaultConfig("Customers CI", "1.0.0")
-		api := humachi.New(router, configs)
-		operation.RegisterCustomerRoutes(api, dbConn, nil)
-
-		server := &http.Server{
-			Addr:    ":8080",
-			Handler: router,
-		}
-
-		go func() {
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("CI server failed: %v", err)
-			}
-		}()
-
-		// Keep process alive for Postman tests
-		select {}
-	} else {
-		var conn *amqp.Connection
-		var ch *amqp.Channel
+	if !disableRabbit {
 		conn, ch = rabbitmq.Connect()
 
 		// Set up event handlers
@@ -79,6 +51,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to start event listener: %v", err)
 		}
+	} else {
+		log.Println("DISABLE_RABBITMQ=true, skipping RabbitMQ connection")
+		conn = nil
+		ch = nil
 	}
 
 	// Create a CLI app which takes a port option.
