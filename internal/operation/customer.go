@@ -193,11 +193,11 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		Path:        "/health",
 		Tags:        []string{"health"},
 	}, func(ctx context.Context, input *struct{}) (*struct {
-		Status string `json:"status"`
+		Message string `json:"message"`
 	}, error) {
 		return &struct {
-			Status string `json:"status"`
-		}{Status: "ok"}, nil
+			Message string `json:"message"`
+		}{Message: "ok"}, nil
 	})
 
 	huma.Register(api, huma.Operation{
