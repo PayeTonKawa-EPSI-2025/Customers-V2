@@ -15,7 +15,7 @@ build-image: build
 	  exit 1; \
 	fi
 
-	docker build -t $(DOCKER_IMAGE):$(VERSION) -t $(DOCKER_IMAGE):latest .
+	podman build -t $(DOCKER_IMAGE):$(VERSION) -t $(DOCKER_IMAGE):latest .
 
 clean:
 	rm -rf build

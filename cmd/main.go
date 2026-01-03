@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/auth"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/db"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/rabbitmq"
@@ -34,6 +36,22 @@ func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
 	conn, ch := rabbitmq.Connect()
+
+	// Initialize Keycloak JWT authentication
+	keycloakRealmURL := os.Getenv("KEYCLOAK_REALM_URL")
+	keycloakPublicKey := os.Getenv("KEYCLOAK_PUBLIC_KEY")
+	if keycloakRealmURL == "" && keycloakPublicKey == "" {
+		log.Println("Warning: KEYCLOAK_REALM_URL or KEYCLOAK_PUBLIC_KEY not set, JWT authentication disabled")
+	} else {
+		err := auth.InitKeycloakAuth(auth.KeycloakConfig{
+			RealmURL:       keycloakRealmURL,
+			RealmPublicKey: keycloakPublicKey,
+		})
+		if err != nil {
+			log.Fatalf("Failed to initialize Keycloak auth: %v", err)
+		}
+		log.Println("✓ Keycloak JWT authentication initialized")
+	}
 
 	// Set up event handlers
 	eventRouter := rabbitmq.SetupEventHandlers(dbConn)
@@ -89,16 +107,40 @@ func main() {
 		router.Use(prometheusMiddleware)
 		router.Handle("/metrics", promhttp.Handler())
 
-		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
-		api := humachi.New(router, configs)
+		// JWT Authentication middleware (if configured)
+		// Apply JWT verification globally to API routes
+		if auth.TokenAuth != nil {
+			router.Group(func(r chi.Router) {
+				// These routes don't require authentication
+				r.Handle("/metrics", promhttp.Handler())
+				r.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
+					http.Error(w, "debug 500", http.StatusInternalServerError)
+				})
+			})
 
-		operation.RegisterCustomerRoutes(api, dbConn, ch)
+			// Protected API routes - require valid JWT
+			router.Group(func(r chi.Router) {
+				r.Use(auth.Verifier())
+				r.Use(auth.Authenticator)
 
-		// Debug endpoints for testing/metrics
-		router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
-			// return an internal server error to create 5xx metrics
-			http.Error(w, "debug 500", http.StatusInternalServerError)
-		})
+				// Mount Huma API on the protected router
+				configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+				api := humachi.New(r, configs)
+
+				operation.RegisterCustomerRoutes(api, dbConn, ch)
+			})
+		} else {
+			// No JWT auth configured, register routes without protection
+			configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+			api := humachi.New(router, configs)
+
+			operation.RegisterCustomerRoutes(api, dbConn, ch)
+
+			// Debug endpoints for testing/metrics
+			router.HandleFunc("/debug/500", func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "debug 500", http.StatusInternalServerError)
+			})
+		}
 
 		// Create the HTTP server.
 		server := http.Server{
