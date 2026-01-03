@@ -180,6 +180,75 @@ func DeleteCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint)
 // ----------------------
 // Register routes with Huma
 // ----------------------
+
+// RegisterAdminCustomerRoutes registers routes that require admin role
+func RegisterAdminCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
+	// Get all customers - admin only
+	huma.Register(api, huma.Operation{
+		OperationID: "get-customers",
+		Summary:     "Get all customers (admin only)",
+		Method:      http.MethodGet,
+		Path:        "/customers",
+		Tags:        []string{"customers"},
+	}, func(ctx context.Context, input *struct{}) (*dto.CustomersOutput, error) {
+		return GetCustomers(ctx, dbConn)
+	})
+}
+
+// RegisterAuthenticatedCustomerRoutes registers routes that require authentication but not admin
+func RegisterAuthenticatedCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-customer",
+		Summary:     "Get a customer",
+		Method:      http.MethodGet,
+		Path:        "/customers/{id}",
+		Tags:        []string{"customers"},
+	}, func(ctx context.Context, input *struct {
+		Id uint `path:"id"`
+	}) (*dto.CustomerOutput, error) {
+		return GetCustomer(ctx, dbConn, input.Id)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "create-customer",
+		Summary:       "Create a customer",
+		Method:        http.MethodPost,
+		DefaultStatus: http.StatusCreated,
+		Path:          "/customers",
+		Tags:          []string{"customers"},
+	}, func(ctx context.Context, input *dto.CustomerCreateInput) (*dto.CustomerOutput, error) {
+		return CreateCustomer(ctx, dbConn, ch, input)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "put-customer",
+		Summary:     "Replace a customer",
+		Method:      http.MethodPut,
+		Path:        "/customers/{id}",
+		Tags:        []string{"customers"},
+	}, func(ctx context.Context, input *struct {
+		Id uint `path:"id"`
+		dto.CustomerCreateInput
+	}) (*dto.CustomerOutput, error) {
+		return UpdateCustomer(ctx, dbConn, ch, input.Id, input.CustomerCreateInput)
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID:   "delete-customer",
+		Summary:       "Delete a customer",
+		Method:        http.MethodDelete,
+		DefaultStatus: http.StatusNoContent,
+		Path:          "/customers/{id}",
+		Tags:          []string{"customers"},
+	}, func(ctx context.Context, input *struct {
+		Id uint `path:"id"`
+	}) (*struct{}, error) {
+		err := DeleteCustomer(ctx, dbConn, ch, input.Id)
+		return &struct{}{}, err
+	})
+}
+
+// RegisterCustomerRoutes registers all customer routes (for backward compatibility)
 func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 
 	huma.Register(api, huma.Operation{

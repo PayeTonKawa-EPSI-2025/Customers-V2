@@ -123,11 +123,25 @@ func main() {
 				r.Use(auth.Verifier())
 				r.Use(auth.Authenticator)
 
-				// Mount Huma API on the protected router
-				configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
-				api := humachi.New(r, configs)
+				// Admin-only routes
+				r.Group(func(r chi.Router) {
+					r.Use(auth.RequireRole("admin"))
 
-				operation.RegisterCustomerRoutes(api, dbConn, ch)
+					// Mount Huma API for admin routes
+					configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+					api := humachi.New(r, configs)
+
+					operation.RegisterAdminCustomerRoutes(api, dbConn, ch)
+				})
+
+				// Regular authenticated routes
+				r.Group(func(r chi.Router) {
+					// Mount Huma API for regular routes
+					configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+					api := humachi.New(r, configs)
+
+					operation.RegisterAuthenticatedCustomerRoutes(api, dbConn, ch)
+				})
 			})
 		} else {
 			// No JWT auth configured, register routes without protection
