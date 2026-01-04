@@ -25,6 +25,23 @@ jobs:
 
       - name: Run govulncheck
         run: govulncheck ./...
+  trivy:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t my-service:pr .
+
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
   tests:
     name: Tests
     runs-on: ubuntu-latest
