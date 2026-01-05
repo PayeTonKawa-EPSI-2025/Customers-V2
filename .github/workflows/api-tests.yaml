@@ -58,7 +58,7 @@ jobs:
         run: |
           for i in {1..30}; do
           echo "Checking Go service (attempt $i)..."
-          if curl -sf http://localhost:8080/health; then
+          if curl -sf http://localhost:8080/customers/health; then
               echo "Go service is up!"
               exit 0
           fi

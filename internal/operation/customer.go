@@ -190,7 +190,7 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		OperationID: "health",
 		Summary:     "Health check endpoint",
 		Method:      http.MethodGet,
-		Path:        "/health",
+		Path:        "/customers/health",
 		Tags:        []string{"health"},
 	}, func(ctx context.Context, input *struct{}) (*struct {
 		Message string `json:"message"`
