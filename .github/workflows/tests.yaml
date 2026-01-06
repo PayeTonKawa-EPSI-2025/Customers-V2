@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build
+        run: docker build -t customers:pr .
 
       - name: Run Trivy scan
         uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
