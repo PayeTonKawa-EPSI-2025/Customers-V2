@@ -19,6 +19,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/auth"
 )
 
 // Options for the CLI.
@@ -33,6 +34,7 @@ var (
 func main() {
 	_ = godotenv.Load()
 	dbConn = db.Init()
+	auth.InitKeycloak()
 	conn, ch := rabbitmq.Connect()
 
 	// Set up event handlers
@@ -46,12 +48,20 @@ func main() {
 
 	// Create a CLI app which takes a port option.
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
+		auth.InitKeycloak()
 		// Create a new router & API
 		router := chi.NewMux()
 
+		router.Use(auth.JWTMiddleware)
 		router.Use(middleware.Logger)
 		router.Use(middleware.Recoverer)
 		router.Use(middleware.Compress(5))
+
+		router.With(auth.RequireRole("customers.read")).
+			Get("/customers", listCustomers)
+
+		router.With(auth.RequireRole("customers.write")).
+			Post("/customers", createCustomer)
 
 		// Prometheus instrumentation (counter + histogram)
 		httpRequests := prometheus.NewCounterVec(
