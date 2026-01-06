@@ -35,7 +35,7 @@ jobs:
         run: docker build -t my-service:pr .
 
       - name: Run Trivy scan
-        uses: aquasecurity/trivy-action@e6c3e6e5e3c62b1f0c3c2a6e8a0b5a1c5baf1c53
+        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4
         with:
           scan-type: fs
           scan-ref: .
