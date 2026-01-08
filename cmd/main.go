@@ -48,20 +48,12 @@ func main() {
 
 	// Create a CLI app which takes a port option.
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		auth.InitKeycloak()
 		// Create a new router & API
 		router := chi.NewMux()
 
-		router.Use(auth.JWTMiddleware)
 		router.Use(middleware.Logger)
 		router.Use(middleware.Recoverer)
 		router.Use(middleware.Compress(5))
-
-		router.With(auth.RequireRole("customers.read")).
-			Get("/customers", listCustomers)
-
-		router.With(auth.RequireRole("customers.write")).
-			Post("/customers", createCustomer)
 
 		// Prometheus instrumentation (counter + histogram)
 		httpRequests := prometheus.NewCounterVec(
@@ -100,6 +92,17 @@ func main() {
 		router.Handle("/metrics", promhttp.Handler())
 
 		configs := huma.DefaultConfig("Paye Ton Kawa - Customers", "1.0.0")
+
+		configs.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+			"bearer": {
+				Type:         "http",
+				Scheme:       "bearer",
+				BearerFormat: "JWT",
+				Description:  "JWT token from Keycloak",
+			},
+		}
+
+
 		api := humachi.New(router, configs)
 
 		operation.RegisterCustomerRoutes(api, dbConn, ch)

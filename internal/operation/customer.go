@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/PayeTonKawa-EPSI-2025/Common-V2/events"
@@ -18,7 +19,45 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"gorm.io/gorm"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/auth"
+
 )
+
+// ----------------------
+// Helper functions
+// ----------------------
+
+// Extract and verify token from Authorization header
+func extractAndVerifyToken(ctx context.Context, authHeader string) (*auth.Claims, error) {
+	if authHeader == "" {
+		return nil, huma.NewError(http.StatusUnauthorized, "Missing authorization header")
+	}
+
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return nil, huma.NewError(http.StatusUnauthorized, "Invalid authorization format")
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	idToken, err := auth.Verifier.Verify(ctx, token)
+	if err != nil {
+		return nil, huma.NewError(http.StatusUnauthorized, "Invalid token")
+	}
+
+	var claims auth.Claims
+	if err := idToken.Claims(&claims); err != nil {
+		return nil, huma.NewError(http.StatusUnauthorized, "Invalid token claims")
+	}
+
+	claims.Normalize()
+	return &claims, nil
+}
+
+// Check if user has a specific role
+func hasRole(claims *auth.Claims, role string) bool {
+	return slices.Contains(claims.Roles, role)
+}
+
 
 // ----------------------
 // Extracted CRUD Functions
@@ -39,10 +78,10 @@ func GetCustomers(ctx context.Context, db *gorm.DB) (*dto.CustomersOutput, error
 }
 
 // Get a single customer by ID
-func GetCustomer(ctx context.Context, db *gorm.DB, id uint) (*dto.CustomerOutput, error) {
+func GetCustomer(ctx context.Context, db *gorm.DB, id uint, claims *auth.Claims) (*dto.CustomerOutput, error) {
 	resp := &dto.CustomerOutput{}
 
-	// 1️⃣ Fetch customer from local DB
+	// Fetch customer from local DB
 	var customer models.Customer
 	results := db.First(&customer, id)
 	if results.Error != nil {
@@ -52,10 +91,17 @@ func GetCustomer(ctx context.Context, db *gorm.DB, id uint) (*dto.CustomerOutput
 		return nil, results.Error
 	}
 
-	// 2️⃣ Assign basic customer data
+
+	// Check authorization: admin or own customer
+	isAdmin := hasRole(claims, "admin")
+	if !isAdmin && customer.Username != claims.PreferredUsername {
+		return nil, huma.NewError(http.StatusForbidden, "You can only access your own customer data")
+	}
+
+	// Assign basic customer data
 	resp.Body = customer
 
-	// 3️⃣ Fetch orders from Orders service API
+	// Fetch orders from Orders service API
 	orders_url := os.Getenv("ORDERS_URL")
 	url := fmt.Sprintf("%s/orders/%d/customers", orders_url, customer.ID)
 	r, err := http.Get(url)
@@ -112,7 +158,7 @@ func CreateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, input *d
 }
 
 // Update/replace a customer
-func UpdateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint, input dto.CustomerCreateInput) (*dto.CustomerOutput, error) {
+func UpdateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint, input dto.CustomerCreateInput, claims *auth.Claims) (*dto.CustomerOutput, error) {
 	resp := &dto.CustomerOutput{}
 
 	var customer models.Customer
@@ -124,6 +170,12 @@ func UpdateCustomer(ctx context.Context, db *gorm.DB, ch *amqp.Channel, id uint,
 	if results.Error != nil {
 		return nil, results.Error
 	}
+
+	// Check authorization: admin or own customer
+	isAdmin := hasRole(claims, "admin")
+    if !isAdmin && customer.Username != claims.PreferredUsername {
+        return nil, huma.NewError(http.StatusForbidden, "You can only update your own customer data")
+    }
 
 	firstname := cases.Title(language.English).String(input.Body.FirstName)
 	lastname := strings.ToUpper(input.Body.LastName)
@@ -188,7 +240,21 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		Method:      http.MethodGet,
 		Path:        "/customers",
 		Tags:        []string{"customers"},
-	}, func(ctx context.Context, input *struct{}) (*dto.CustomersOutput, error) {
+		 Security: []map[string][]string{
+        {"bearer": {}},
+    },
+	}, func(ctx context.Context, input *struct{
+		Authorization string `header:"Authorization"`
+		}) (*dto.CustomersOutput, error) {
+
+		claims, err := extractAndVerifyToken(ctx, input.Authorization)
+		if err != nil {
+			return nil, err
+		}
+		
+		if !hasRole(claims, "admin") {
+			return nil, huma.NewError(http.StatusForbidden, "Admin access required")
+		}
 		return GetCustomers(ctx, dbConn)
 	})
 
@@ -198,10 +264,19 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		Method:      http.MethodGet,
 		Path:        "/customers/{id}",
 		Tags:        []string{"customers"},
-	}, func(ctx context.Context, input *struct {
+		Security: []map[string][]string{
+			{"bearer": {}},
+		},
+	}, func(ctx context.Context, input *struct 
+		{
+		Authorization string `header:"Authorization"`	
 		Id uint `path:"id"`
 	}) (*dto.CustomerOutput, error) {
-		return GetCustomer(ctx, dbConn, input.Id)
+		claims, err := extractAndVerifyToken(ctx, input.Authorization)
+		if err != nil {
+			return nil, err
+		}
+		return GetCustomer(ctx, dbConn, input.Id, claims)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -211,8 +286,22 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		DefaultStatus: http.StatusCreated,
 		Path:          "/customers",
 		Tags:          []string{"customers"},
-	}, func(ctx context.Context, input *dto.CustomerCreateInput) (*dto.CustomerOutput, error) {
-		return CreateCustomer(ctx, dbConn, ch, input)
+		Security: []map[string][]string{
+			{"bearer": {}},
+		},
+	}, func(ctx context.Context, input *struct {
+		Authorization string `header:"Authorization"`
+		dto.CustomerCreateInput}) (*dto.CustomerOutput, error) {
+		claims, err := extractAndVerifyToken(ctx, input.Authorization)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check admin role
+		if !hasRole(claims, "admin") {
+			return nil, huma.NewError(http.StatusForbidden, "Admin access required")
+		}
+		return CreateCustomer(ctx, dbConn, ch, &input.CustomerCreateInput)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -221,11 +310,19 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		Method:      http.MethodPut,
 		Path:        "/customers/{id}",
 		Tags:        []string{"customers"},
+		Security: []map[string][]string{
+			{"bearer": {}},
+		},
 	}, func(ctx context.Context, input *struct {
+		Authorization string `header:"Authorization"`
 		Id uint `path:"id"`
 		dto.CustomerCreateInput
 	}) (*dto.CustomerOutput, error) {
-		return UpdateCustomer(ctx, dbConn, ch, input.Id, input.CustomerCreateInput)
+		claims, err := extractAndVerifyToken(ctx, input.Authorization)
+		if err != nil {
+			return nil, err
+		}
+		return UpdateCustomer(ctx, dbConn, ch, input.Id, input.CustomerCreateInput, claims)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -235,10 +332,34 @@ func RegisterCustomerRoutes(api huma.API, dbConn *gorm.DB, ch *amqp.Channel) {
 		DefaultStatus: http.StatusNoContent,
 		Path:          "/customers/{id}",
 		Tags:          []string{"customers"},
+		Security: []map[string][]string{
+			{"bearer": {}},
+		},
 	}, func(ctx context.Context, input *struct {
+		Authorization string `header:"Authorization"`
 		Id uint `path:"id"`
 	}) (*struct{}, error) {
-		err := DeleteCustomer(ctx, dbConn, ch, input.Id)
+		claims, err := extractAndVerifyToken(ctx, input.Authorization)
+		if err != nil {
+			return &struct{}{}, err
+		}
+
+		// Check admin role
+		if !hasRole(claims, "admin") {
+			return &struct{}{}, huma.NewError(http.StatusForbidden, "Admin access required")
+		}
+
+		err = DeleteCustomer(ctx, dbConn, ch, input.Id)
 		return &struct{}{}, err
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-customers",
+		Summary:     "Get all customers",
+		Method:      http.MethodGet,
+		Path:        "/customers",
+		Tags:        []string{"customers"},
+	}, func(ctx context.Context, input *struct{}) (*dto.CustomersOutput, error) {
+		return GetCustomers(ctx, dbConn)
 	})
 }
