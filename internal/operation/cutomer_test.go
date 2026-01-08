@@ -7,6 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/auth"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/dto"
 	"github.com/PayeTonKawa-EPSI-2025/Customers-V2/internal/operation"
 	"gorm.io/driver/postgres"
@@ -27,6 +28,22 @@ func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock) {
 	}
 
 	return gormDB, mock
+}
+
+func createAdminClaims() *auth.Claims {
+	return &auth.Claims{
+		PreferredUsername: "admin",
+		Email:             "admin@test.com",
+		Roles:             []string{"admin"},
+	}
+}
+
+func createUserClaims(username string) *auth.Claims {
+	return &auth.Claims{
+		PreferredUsername: username,
+		Email:             username + "@test.com",
+		Roles:             []string{"user"},
+	}
 }
 
 func TestGetCustomers(t *testing.T) {
@@ -58,14 +75,76 @@ func TestGetCustomers(t *testing.T) {
 
 func TestGetCustomerNotFound(t *testing.T) {
 	db, mock := setupMockDB(t)
+	claims := createAdminClaims()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
 		WithArgs(1, sqlmock.AnyArg()).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	_, err := operation.GetCustomer(context.Background(), db, 1)
+	_, err := operation.GetCustomer(context.Background(), db, 1, claims)
 	if err == nil {
 		t.Fatal("expected error for non-existent customer")
+	}
+}
+
+func TestGetCustomerAsAdmin(t *testing.T) {
+	db, mock := setupMockDB(t)
+	claims := createAdminClaims()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).
+			AddRow(1, "jdoe", "John", "DOE"))
+
+	resp, err := operation.GetCustomer(context.Background(), db, 1, claims)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if resp.Body.Username != "jdoe" {
+		t.Errorf("expected username 'jdoe', got '%s'", resp.Body.Username)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled sqlmock expectations: %v", err)
+	}
+}
+
+func TestGetCustomerAsOwner(t *testing.T) {
+	db, mock := setupMockDB(t)
+	claims := createUserClaims("jdoe")
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).
+			AddRow(1, "jdoe", "John", "DOE"))
+
+	resp, err := operation.GetCustomer(context.Background(), db, 1, claims)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if resp.Body.Username != "jdoe" {
+		t.Errorf("expected username 'jdoe', got '%s'", resp.Body.Username)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled sqlmock expectations: %v", err)
+	}
+}
+
+func TestGetCustomerForbidden(t *testing.T) {
+	db, mock := setupMockDB(t)
+	claims := createUserClaims("asmith") // Different user
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).
+			AddRow(1, "jdoe", "John", "DOE"))
+
+	_, err := operation.GetCustomer(context.Background(), db, 1, claims)
+	if err == nil {
+		t.Fatal("expected forbidden error when accessing other user's customer")
 	}
 }
 
@@ -114,6 +193,7 @@ func TestCreateCustomer(t *testing.T) {
 
 func TestUpdateCustomer(t *testing.T) {
 	db, mock := setupMockDB(t)
+	claims := createAdminClaims()
 
 	// Mock selecting existing customer
 	mock.ExpectQuery(`SELECT \* FROM "customers".*`).
@@ -126,6 +206,12 @@ func TestUpdateCustomer(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
+	// Mock reload
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "customers" WHERE "customers"."id" = $1`)).
+		WithArgs(1, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "first_name", "last_name"}).
+			AddRow(1, "jdoe2", "Johnny", "DOE"))
+
 	input := dto.CustomerCreateInput{
 		Body: dto.CustomerCreateBody{
 			Username:  "jdoe2",
@@ -136,7 +222,7 @@ func TestUpdateCustomer(t *testing.T) {
 		},
 	}
 
-	resp, err := operation.UpdateCustomer(context.Background(), db, nil, 1, input)
+	resp, err := operation.UpdateCustomer(context.Background(), db, nil, 1, input, claims)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
