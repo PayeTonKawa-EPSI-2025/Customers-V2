@@ -1,4 +1,4 @@
-package db_test
+package integration_test
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func Connect(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-func StopSeededTest(t *testing.T, pool *pgxpool.Pool) {
+func ResetCustomersTable(t *testing.T, pool *pgxpool.Pool) {
 	// Safe cleanup: only truncate if table exists
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(),
@@ -115,5 +115,5 @@ func TestDBConnectAndSeed(t *testing.T) {
 		t.Errorf("expected 2 customers, got %d", count)
 	}
 
-	StopSeededTest(t, pool)
+	ResetCustomersTable(t, pool)
 }
