@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
