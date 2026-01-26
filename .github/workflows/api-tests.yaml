@@ -86,6 +86,7 @@ jobs:
           target: "http://localhost:8080/swagger.json"
           format: openapi
           fail_action: true
+          github_token: ""
 
       # Cleanup: stop Go service
       - name: Stop Go service
