@@ -76,20 +76,53 @@ jobs:
     needs: automated-api-tests
 
     services:
-      api:
-        image: myorg/api-gateway:latest
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
         ports:
-          - 8080:8080
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_DSN: postgresql://test:test@localhost:5432/testdb
+      DISABLE_RABBITMQ: "true"
 
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p 5432 -U test; do
+            sleep 1
+          done
+
+      - name: Run Go service
+        run: |
+          go run ./cmd/main.go -p 8080 &
+          echo $! > go.pid
+
       - name: Wait for API
         run: |
-          for i in {1..20}; do
-            curl -s http://localhost:8080/health && exit 0
-            sleep 3
+          for i in {1..30}; do
+            echo "Checking API (attempt $i)..."
+            if curl -sf http://localhost:8080/health; then
+              echo "API is up!"
+              exit 0
+            fi
+            sleep 2
           done
+          echo "API failed to start"
           exit 1
 
       - name: OWASP ZAP OpenAPI Scan
