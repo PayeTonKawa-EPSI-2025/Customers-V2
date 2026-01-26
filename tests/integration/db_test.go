@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Connect returns a pgxpool.Pool connected to DATABASE_DSN.
+// ConnectDB connects to the database using GORM.
 // Fails the test if DATABASE_DSN is not set or DB is unreachable.
 func ConnectDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -21,22 +20,20 @@ func ConnectDB(t *testing.T) *gorm.DB {
 		t.Fatal("DATABASE_DSN not set")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect DB: %v", err)
 	}
 
 	sqlDB, _ := db.DB()
-	if err := sqlDB.PingContext(ctx); err != nil {
+	if err := sqlDB.Ping(); err != nil {
 		t.Fatalf("DB unreachable: %v", err)
 	}
 
 	return db
 }
 
+// ResetCustomersTable truncates the customers table.
 func ResetCustomersTable(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	if err := db.Exec("TRUNCATE TABLE customers RESTART IDENTITY CASCADE").Error; err != nil {
@@ -48,9 +45,7 @@ func ResetCustomersTable(t *testing.T, db *gorm.DB) {
 func SeedDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 
-	// Create table automatically (optional)
-	err := db.AutoMigrate(&models.Customer{})
-	if err != nil {
+	if err := db.AutoMigrate(&models.Customer{}); err != nil {
 		t.Fatalf("failed to auto migrate: %v", err)
 	}
 
@@ -95,11 +90,11 @@ func SeedDB(t *testing.T, db *gorm.DB) {
 // -------------------- TESTS -------------------- //
 
 func TestDBConnect(t *testing.T) {
-	pool := ConnectDB(t)
+	db := ConnectDB(t)
 
 	var now time.Time
-	err := pool.QueryRow(context.Background(), "SELECT NOW()").Scan(&now)
-	if err != nil {
+	// GORM raw query
+	if err := db.Raw("SELECT NOW()").Scan(&now).Error; err != nil {
 		t.Fatalf("query failed: %v", err)
 	}
 
@@ -107,12 +102,12 @@ func TestDBConnect(t *testing.T) {
 }
 
 func TestDBConnectAndSeed(t *testing.T) {
-	pool := ConnectDB(t)
-	SeedDB(t, pool)
+	db := ConnectDB(t)
+	SeedDB(t, db)
 
 	var count int
-	err := pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM customers").Scan(&count)
-	if err != nil {
+	// GORM raw query
+	if err := db.Raw("SELECT COUNT(*) FROM customers").Scan(&count).Error; err != nil {
 		t.Fatalf("failed to count customers: %v", err)
 	}
 
@@ -120,5 +115,5 @@ func TestDBConnectAndSeed(t *testing.T) {
 		t.Errorf("expected 2 customers, got %d", count)
 	}
 
-	ResetCustomersTable(t, pool)
+	ResetCustomersTable(t, db)
 }

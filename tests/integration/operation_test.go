@@ -97,7 +97,8 @@ func TestIntegration_DeleteCustomer(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	resp, err := operation.GetCustomer(context.Background(), db, 1)
+	// Ignore resp since we only care about the error
+	_, err = operation.GetCustomer(context.Background(), db, 1)
 	if err == nil {
 		t.Fatalf("expected not found after delete")
 	}
