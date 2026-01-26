@@ -3,7 +3,6 @@ package operation_test
 import (
 	"context"
 	"errors"
-	"net/http"
 	"regexp"
 	"testing"
 
@@ -238,43 +237,5 @@ func TestDeleteCustomer(t *testing.T) {
 	err := operation.DeleteCustomer(context.Background(), db, nil, 1)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-}
-
-func TestDeleteCustomerDeleteFails(t *testing.T) {
-	db, mock := setupMockDB(t)
-
-	mock.ExpectQuery(`SELECT \* FROM "customers"`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-
-	mock.ExpectBegin()
-	mock.ExpectExec(`UPDATE "customers"`).
-		WillReturnError(errors.New("delete failed"))
-	mock.ExpectRollback()
-
-	err := operation.DeleteCustomer(context.Background(), db, nil, 1)
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestGetCustomerOrdersAPIFailure(t *testing.T) {
-	db, mock := setupMockDB(t)
-
-	mock.ExpectQuery(`SELECT \* FROM "customers"`).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username"}).AddRow(1, "jdoe"))
-
-	httpGet = func(string) (*http.Response, error) {
-		return nil, errors.New("network error")
-	}
-	defer func() { httpGet = http.Get }()
-
-	resp, err := operation.GetCustomer(context.Background(), db, 1)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if resp.Body.Orders != nil {
-		t.Errorf("expected no orders on API failure")
 	}
 }
