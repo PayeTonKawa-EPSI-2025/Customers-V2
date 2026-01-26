@@ -6,75 +6,51 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PayeTonKawa-EPSI-2025/Common-V2/models"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // Connect returns a pgxpool.Pool connected to DATABASE_DSN.
 // Fails the test if DATABASE_DSN is not set or DB is unreachable.
-func ConnectDB(t *testing.T) *pgxpool.Pool {
+func ConnectDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
 	dsn := os.Getenv("DATABASE_DSN")
 	if dsn == "" {
-		t.Fatal("DATABASE_DSN is not set")
+		t.Fatal("DATABASE_DSN not set")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, dsn)
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		t.Fatalf("failed to create pg pool: %v", err)
+		t.Fatalf("failed to connect DB: %v", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		t.Fatalf("failed to ping postgres: %v", err)
+	sqlDB, _ := db.DB()
+	if err := sqlDB.PingContext(ctx); err != nil {
+		t.Fatalf("DB unreachable: %v", err)
 	}
 
-	return pool
+	return db
 }
 
-func ResetCustomersTable(t *testing.T, pool *pgxpool.Pool) {
-	// Safe cleanup: only truncate if table exists
-	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(),
-			`DO $$
-			BEGIN
-				IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'customers') THEN
-					TRUNCATE TABLE customers RESTART IDENTITY CASCADE;
-				END IF;
-			END
-			$$;`)
-	})
+func ResetCustomersTable(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	if err := db.Exec("TRUNCATE TABLE customers RESTART IDENTITY CASCADE").Error; err != nil {
+		t.Fatalf("failed to reset customers table: %v", err)
+	}
 }
 
 // SeedDB creates the customers table if missing and inserts sample data.
-func SeedDB(t *testing.T, pool *pgxpool.Pool) {
+func SeedDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Create table with new fields if missing
-	_, err := pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS customers (
-			id SERIAL PRIMARY KEY,
-			username TEXT NOT NULL UNIQUE,
-			first_name TEXT NOT NULL,
-			last_name TEXT NOT NULL,
-			name TEXT NOT NULL,
-
-			postal_code TEXT,
-			city TEXT,
-			company_name TEXT,
-
-			created_at TIMESTAMP NOT NULL DEFAULT NOW()
-		)
-	`)
+	// Create table automatically (optional)
+	err := db.AutoMigrate(&models.Customer{})
 	if err != nil {
-		t.Fatalf("failed to create customers table: %v", err)
+		t.Fatalf("failed to auto migrate: %v", err)
 	}
 
 	customers := []models.Customer{
@@ -107,30 +83,8 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 	}
 
 	for _, c := range customers {
-		_, err := pool.Exec(ctx, `
-			INSERT INTO customers (
-				username,
-				first_name,
-				last_name,
-				name,
-				postal_code,
-				city,
-				company_name
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (username) DO NOTHING
-		`,
-			c.Username,
-			c.FirstName,
-			c.LastName,
-			c.Name,
-			c.Address.PostalCode,
-			c.Address.City,
-			c.Company.CompanyName,
-		)
-
-		if err != nil {
-			t.Fatalf("failed to insert customer %s: %v", c.Username, err)
+		if err := db.Create(&c).Error; err != nil {
+			t.Fatalf("failed to seed customer %s: %v", c.Username, err)
 		}
 	}
 
