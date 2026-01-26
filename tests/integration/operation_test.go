@@ -29,10 +29,17 @@ func TestIntegration_CreateCustomer(t *testing.T) {
 	ResetCustomersTable(t, db)
 
 	input := dto.CustomerCreateInput{
-		Body: models.Customer{
-			Username:  "john",
-			FirstName: "john",
-			LastName:  "doe",
+		Body: dto.CustomerCreateBody{
+			Username:  "John",
+			FirstName: "John",
+			LastName:  "Doe",
+			Address: models.Address{
+				PostalCode: "75002",
+				City:       "Paris",
+			},
+			Company: models.Company{
+				CompanyName: "Created Corp",
+			},
 		},
 	}
 
@@ -41,8 +48,8 @@ func TestIntegration_CreateCustomer(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if resp.Body.Username != "john" {
-		t.Fatalf("expected username john")
+	if resp.Body.Username != "John" {
+		t.Fatalf("expected username John")
 	}
 }
 
@@ -52,11 +59,17 @@ func TestIntegration_UpdateCustomer(t *testing.T) {
 	SeedDB(t, db)
 
 	input := dto.CustomerCreateInput{
-		Body: models.Customer{
+		Body: dto.CustomerCreateBody{
 			Username:  "alice_updated",
 			FirstName: "Alice",
 			LastName:  "Smith",
-			Name:      "Alice Smith",
+			Address: models.Address{
+				PostalCode: "75002",
+				City:       "Paris",
+			},
+			Company: models.Company{
+				CompanyName: "Updated Corp",
+			},
 		},
 	}
 
@@ -66,7 +79,11 @@ func TestIntegration_UpdateCustomer(t *testing.T) {
 	}
 
 	if resp.Body.Username != "alice_updated" {
-		t.Fatalf("update failed")
+		t.Fatalf("expected username 'alice_updated', got '%s'", resp.Body.Username)
+	}
+
+	if resp.Body.Address.City != "Paris" {
+		t.Fatalf("expected city 'Paris', got '%s'", resp.Body.Address.City)
 	}
 }
 

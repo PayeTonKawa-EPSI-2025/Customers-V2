@@ -12,7 +12,7 @@ import (
 
 // Connect returns a pgxpool.Pool connected to DATABASE_DSN.
 // Fails the test if DATABASE_DSN is not set or DB is unreachable.
-func Connect(t *testing.T) *pgxpool.Pool {
+func ConnectDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
 	dsn := os.Getenv("DATABASE_DSN")
@@ -53,9 +53,11 @@ func ResetCustomersTable(t *testing.T, pool *pgxpool.Pool) {
 // SeedDB creates the customers table if missing and inserts sample data.
 func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Create table with new fields if missing
 	_, err := pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS customers (
 			id SERIAL PRIMARY KEY,
@@ -63,6 +65,11 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 			first_name TEXT NOT NULL,
 			last_name TEXT NOT NULL,
 			name TEXT NOT NULL,
+
+			postal_code TEXT,
+			city TEXT,
+			company_name TEXT,
+
 			created_at TIMESTAMP NOT NULL DEFAULT NOW()
 		)
 	`)
@@ -71,14 +78,57 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 	}
 
 	customers := []models.Customer{
-		{Username: "Alice", FirstName: "Alice", LastName: "Smith", Name: "Alice Smith"},
-		{Username: "Bob", FirstName: "Bob", LastName: "Johnson", Name: "Bob Johnson"},
+		{
+			Username:  "Alice",
+			FirstName: "Alice",
+			LastName:  "Smith",
+			Name:      "Alice Smith",
+			Address: models.Address{
+				PostalCode: "75001",
+				City:       "Paris",
+			},
+			Company: models.Company{
+				CompanyName: "ACME Corp",
+			},
+		},
+		{
+			Username:  "Bob",
+			FirstName: "Bob",
+			LastName:  "Johnson",
+			Name:      "Bob Johnson",
+			Address: models.Address{
+				PostalCode: "69000",
+				City:       "Lyon",
+			},
+			Company: models.Company{
+				CompanyName: "Globex",
+			},
+		},
 	}
 
 	for _, c := range customers {
 		_, err := pool.Exec(ctx, `
-			INSERT INTO customers (username, first_name, last_name, name) VALUES ($1, $2, $3, $4)
-		`, c.Username, c.FirstName, c.LastName, c.Name)
+			INSERT INTO customers (
+				username,
+				first_name,
+				last_name,
+				name,
+				postal_code,
+				city,
+				company_name
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (username) DO NOTHING
+		`,
+			c.Username,
+			c.FirstName,
+			c.LastName,
+			c.Name,
+			c.Address.PostalCode,
+			c.Address.City,
+			c.Company.CompanyName,
+		)
+
 		if err != nil {
 			t.Fatalf("failed to insert customer %s: %v", c.Username, err)
 		}
@@ -90,7 +140,7 @@ func SeedDB(t *testing.T, pool *pgxpool.Pool) {
 // -------------------- TESTS -------------------- //
 
 func TestDBConnect(t *testing.T) {
-	pool := Connect(t)
+	pool := ConnectDB(t)
 
 	var now time.Time
 	err := pool.QueryRow(context.Background(), "SELECT NOW()").Scan(&now)
@@ -102,7 +152,7 @@ func TestDBConnect(t *testing.T) {
 }
 
 func TestDBConnectAndSeed(t *testing.T) {
-	pool := Connect(t)
+	pool := ConnectDB(t)
 	SeedDB(t, pool)
 
 	var count int
