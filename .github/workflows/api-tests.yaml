@@ -9,6 +9,8 @@ on:
 jobs:
   api_tests_and_security:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
 
     services:
       postgres:
@@ -86,7 +88,7 @@ jobs:
           target: "http://localhost:8080/swagger.json"
           format: openapi
           fail_action: true
-          github_token: ""
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # Cleanup: stop Go service
       - name: Stop Go service
